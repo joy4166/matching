@@ -595,6 +595,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 결과 렌더링 함수
     function renderMatchingResults() {
+        // 동점 경합 중 실제 경합 쌍이 없는 경우(경쟁 상대가 이미 다른 매칭으로 매칭/제거되어 단독 매칭이 된 경우) 경합 상태 해제
+        matchedCouples.forEach(c => {
+            if (c.isConflict) {
+                const hasCompetitor = matchedCouples.some(oc => 
+                    oc !== c && (oc.male.name === c.male.name || oc.female.name === c.female.name)
+                );
+                if (!hasCompetitor) {
+                    c.isConflict = false;
+                }
+            }
+        });
+
         // UI 전환
         statusCard.classList.add('hidden');
         resultsCard.classList.remove('hidden');
@@ -811,11 +823,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
                 const sharedPerson = matchedCouples.some(oc => oc !== couple && oc.male.name === couple.male.name) ? couple.male.name : couple.female.name;
+                const currentPartner = sharedPerson === couple.male.name ? couple.female.name : couple.male.name;
                 
                 const reasonBoxHtml = `
                     <div class="conflict-reason-box">
                         <strong>⚠️ 동점 선택 대기:</strong><br>
-                        <strong>${sharedPerson}</strong>님에 대해 <strong>${[sharedPerson, ...competing].join(', ')}</strong>님이 동일한 선호 점수(<strong>${couple.score}점</strong>)를 기록하여 조율 대기 중입니다.
+                        <strong>${sharedPerson}</strong>님에 대해 <strong>${[currentPartner, ...competing].join(', ')}</strong>님이 동일한 선호 점수(<strong>${couple.score}점</strong>)를 기록하여 조율 대기 중입니다.
                     </div>
                     <button class="btn-confirm-match" onclick="resolveConflict('${couple.male.name}', '${couple.female.name}')">
                         이 매칭 최종 확정하기
@@ -1044,10 +1057,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
                 const sharedPerson = matchedCouples.some(oc => oc !== c && oc.male.name === c.male.name) ? c.male.name : c.female.name;
+                const currentPartner = sharedPerson === c.male.name ? c.female.name : c.male.name;
                 
                 conflictNoticeHtml = `
                     <div class="conflict-reason-box" style="margin-top: 10px; padding: 10px; background: rgba(249, 115, 22, 0.08); border: 1px solid rgba(249, 115, 22, 0.2); border-radius: 8px; font-size: 0.78rem; color: #ff9d75; text-align: left; line-height: 1.4;">
-                        <strong>⚠️ 동점 선택 대기:</strong> ${sharedPerson}님에 대해 ${[sharedPerson, ...competing].join(', ')}님이 동일한 선호 점수(${c.score}점)를 기록하여 조율 대기 중입니다.
+                        <strong>⚠️ 동점 선택 대기:</strong> ${sharedPerson}님에 대해 ${[currentPartner, ...competing].join(', ')}님이 동일한 선호 점수(${c.score}점)를 기록하여 조율 대기 중입니다.
                     </div>
                 `;
             } else if (c.matchType === 'mutual-1-1') {
