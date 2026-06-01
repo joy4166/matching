@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>청춘작당 비공개매칭</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Outfit:wght@300;400;600;800&family=Jua&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="stars-container"></div>
+
+    <div class="app-container">
+        <!-- HEADER -->
+        <header class="app-header">
+            <div class="logo-area">
+                <span class="heart-pulse">💖</span>
+                <h1>청춘작당 <span>비공개매칭</span></h1>
+            </div>
+        </header>
+
+        <main class="app-main">
+            <!-- LEFT PANEL: INPUT -->
+            <section class="left-panel">
+                <!-- 1. FILE UPLOADER -->
+                <div class="glass-card upload-card">
+                    <div class="card-header">
+                        <span class="icon">📁</span>
+                        <h2>설문조사 데이터 가져오기</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="drag-drop-zone" id="drop-zone">
+                            <div class="upload-icon">📊</div>
+                            <p class="upload-text">CSV 파일을 여기로 드래그하거나 클릭하여 업로드하세요</p>
+                            <span class="file-info" id="file-info-text">지원 형식: UTF-8 인코딩 된 .csv</span>
+                            <input type="file" id="file-input" accept=".csv" class="hidden-file-input">
+                        </div>
+
+                        <div class="sample-actions">
+                            <button class="btn btn-outline" id="btn-demo">샘플 데이터로 체험하기</button>
+                            <button class="btn btn-link" id="btn-download-sample">CSV 템플릿 양식 받기</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT PANEL: DASHBOARD & RESULTS -->
+            <section class="right-panel">
+                <!-- 3. DATA STATUS & VALIDATION -->
+                <div class="glass-card status-card hidden" id="status-card">
+                    <div class="card-header">
+                        <span class="icon">🔍</span>
+                        <h2>데이터 유효성 검사 및 정제</h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="status-summary">
+                            <div class="stat-mini">
+                                <span class="stat-mini-label">총 참가자</span>
+                                <span class="stat-mini-val" id="count-total">0명</span>
+                            </div>
+                            <div class="stat-mini">
+                                <span class="stat-mini-label">남성</span>
+                                <span class="stat-mini-val male-color" id="count-male">0명</span>
+                            </div>
+                            <div class="stat-mini">
+                                <span class="stat-mini-label">여성</span>
+                                <span class="stat-mini-val female-color" id="count-female">0명</span>
+                            </div>
+                        </div>
+
+                        <div class="validation-container">
+                            <h3>유효성 오류 및 경고 <span class="count-badge" id="validation-count">0</span></h3>
+                            <div class="validation-list" id="validation-list">
+                                <div class="empty-validation">데이터 검사 결과 이상이 없습니다.</div>
+                            </div>
+                        </div>
+
+                        <div class="action-bar">
+                            <button class="btn btn-primary" id="btn-run-matching">⚡ 매칭 시작하기</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. MATCHING RESULTS (DASHBOARD) -->
+                <div class="glass-card results-card hidden" id="results-card">
+                    <div class="card-header flex-header">
+                        <div class="title-with-icon">
+                            <span class="icon">✨</span>
+                            <h2>청춘작당 매칭 결과 보고서</h2>
+                        </div>
+                        <div class="actions">
+                            <button class="btn btn-primary" id="btn-print">🖨️ 결과 인쇄</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- STATS BOARD -->
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-val" id="stat-couple-count">0</div>
+                                <div class="stat-label">성사된 커플 수</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-val" id="stat-matching-rate">0%</div>
+                                <div class="stat-label">전체 매칭 성공률</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-val" id="stat-avg-satisfaction">0.0</div>
+                                <div class="stat-label">평균 매칭 지수 (최대 10점)</div>
+                            </div>
+                        </div>
+
+                        <!-- RESULT TABS -->
+                        <div class="tabs-container">
+                            <div class="tab-buttons">
+                                <button class="tab-btn active" data-tab="tab-couples">💖 매칭 완료 커플 (<span
+                                        id="count-couples-tab">0</span>)</button>
+                                <button class="tab-btn" data-tab="tab-unmatched">💔 미매칭 대상자 (<span
+                                        id="count-unmatched-tab">0</span>)</button>
+                                <button class="tab-btn" data-tab="tab-details">📊 매칭 디테일 스코어</button>
+                            </div>
+
+                            <div class="tab-content active" id="tab-couples">
+                                <div class="search-filter-bar">
+                                    <input type="text" placeholder="이름으로 검색..." class="search-input"
+                                        id="search-couples">
+                                    <select class="filter-select" id="filter-couple-type">
+                                        <option value="all">모든 커플 유형</option>
+                                        <option value="mutual-1-1">1순위 💖 1순위 (천생연분)</option>
+                                        <option value="mutual-high">상호 1~2순위 매칭</option>
+                                        <option value="conflict">⚠️ 선택 대기 커플 (동점)</option>
+                                    </select>
+                                </div>
+                                <div class="couples-grid" id="couples-container">
+                                    <!-- Cards dynamically added here -->
+                                </div>
+                            </div>
+
+                            <div class="tab-content" id="tab-unmatched">
+                                <div class="search-filter-bar">
+                                    <input type="text" placeholder="이름으로 검색..." class="search-input"
+                                        id="search-unmatched">
+                                </div>
+                                <div class="unmatched-list-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>이름</th>
+                                                <th>성별</th>
+                                                <th>내가 지목한 1, 2, 3순위</th>
+                                                <th>나를 지목한 이성 수</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="unmatched-tbody">
+                                            <!-- Dynamic rows -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="tab-content" id="tab-details">
+                                <div class="unmatched-list-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th>순위</th>
+                                                <th>매칭 커플</th>
+                                                <th>남성 선호 순위</th>
+                                                <th>여성 선호 순위</th>
+                                                <th>최종 매칭 점수</th>
+                                                <th>종류</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="details-tbody">
+                                            <!-- Dynamic rows -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- INTRO PLATFORM WELCOME -->
+                <div class="glass-card welcome-card" id="welcome-card">
+                    <div class="welcome-content">
+                        <div class="welcome-badge">🚀 청춘작당 전용 시스템</div>
+                        <h2>빠르고 완벽한 비공개매칭 시스템</h2>
+                        <p>모든 이벤트가 완료되었나요? 참가자들이 제출한 구글 폼 설문조사 결과 CSV 파일을 업로드해 주세요.</p>
+
+                        <div class="how-it-works">
+                            <div class="step">
+                                <div class="step-num">1</div>
+                                <h4>CSV 파일 준비</h4>
+                                <p>참가자 이름, 성별, 1~3순위 열이 포함된 설문 데이터를 다운로드합니다.</p>
+                            </div>
+                            <div class="step">
+                                <div class="step-num">2</div>
+                                <h4>데이터 업로드 & 매핑</h4>
+                                <p>파일을 올리면 열 이름을 매핑하여 형식을 자동으로 인식합니다.</p>
+                            </div>
+                            <div class="step">
+                                <div class="step-num">3</div>
+                                <h4>매칭 계산 및 확인</h4>
+                                <p>클릭 한 번으로 최적의 알고리즘에 의해 커플이 결성됩니다.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+        </main>
+
+        <!-- FOOTER -->
+        <footer class="app-footer">
+            <div class="footer-content">
+                <!-- PARTNERS / SPONSORS LOGO BAR -->
+                <div class="footer-partners">
+                    <div class="partner-section">
+                        <span class="partner-badge badge-host">주최</span>
+                        <span class="partner-brand">부산생명돌봄국민운동</span>
+                    </div>
+                    <div class="partner-divider-dot"></div>
+                    <div class="partner-section">
+                        <span class="partner-badge badge-organizer">주관</span>
+                        <div class="partner-brands">
+                            <span class="partner-brand">부산생명돌봄국민운동</span>
+                            <span class="partner-comma">,</span>
+                            <img src="justjoy_logo.png" alt="JUSTJOY" class="brand-justjoy-img">
+                            <span class="partner-comma">,</span>
+                            <span class="partner-brand brand-cbs">부산 CBS</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="footer-info">
+                    <span>담당자: 이희성 간사 | 문의: 2huiseong@gmail.com</span>
+                </div>
+                <div class="footer-security">
+                    🔒 <strong>개인정보 활용 안내:</strong> 본 매칭 시스템에 업로드한 설문 데이터 및 개인정보는 외부 웹 서버로 전송되지 않고 로컬 PC 브라우저 내부에서만 연산 후
+                    즉시 파기되므로 개인정보 유출 우려가 전혀 없습니다.
+                </div>
+                <div class="footer-copyright">
+                    © JUSTJOY. All rights reserved.
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- COLUMN MAPPER MODAL -->
+    <div class="modal-backdrop hidden" id="mapper-modal">
+        <div class="glass-card modal-card">
+            <div class="modal-header">
+                <h2>📋 CSV 컬럼 헤더 매핑</h2>
+                <p>업로드하신 CSV 파일의 컬럼(열)이 각각 어떤 데이터에 해당하는지 지정해 주세요.</p>
+            </div>
+            <div class="modal-body">
+                <table class="mapping-table">
+                    <thead>
+                        <tr>
+                            <th>필수 정보</th>
+                            <th>프로그램 필드</th>
+                            <th>CSV 파일 내 일치하는 열 선택</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mapping-tbody">
+                        <!-- Dynamic mapping rows -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btn-close-mapper">취소</button>
+                <button class="btn btn-primary" id="btn-confirm-mapper">✅ 매핑 완료 및 분석</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PRINT VIEW CONTAINER (Hidden normally, used for paper print layout) -->
+    <div id="print-section" class="print-only">
+        <!-- Will be dynamically populated for clean prints -->
+    </div>
+    <script src="app.js"></script>
+</body>
+
+</html>
