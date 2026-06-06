@@ -9,6 +9,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let participants = [];    // 정제된 참가자 객체 목록
     let matchedCouples = [];  // 매칭된 커플 결과 목록
     let unmatchedList = [];   // 미매칭 참가자 목록
+    let brokenCouples = [];   // 취소/깨진 커플 목록 (실시간 재매칭용)
+    let allPossiblePairsGlobal = []; // 가능한 모든 상호 매칭 조합 (인쇄용)
     
     // 매핑 필드 정의
     const requiredFields = [
@@ -57,10 +59,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const couplesContainer = document.getElementById('couples-container');
     const unmatchedTbody = document.getElementById('unmatched-tbody');
     const detailsTbody = document.getElementById('details-tbody');
+    const allPossibleTbody = document.getElementById('all-possible-tbody');
     
     const searchCouplesEl = document.getElementById('search-couples');
     const filterCoupleTypeEl = document.getElementById('filter-couple-type');
     const searchUnmatchedEl = document.getElementById('search-unmatched');
+    const searchAllPossibleEl = document.getElementById('search-all-possible');
     
     const btnPrint = document.getElementById('btn-print');
     const printSection = document.getElementById('print-section');
@@ -279,6 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 7. 참가자 데이터 정제 및 유효성 진단
     function processParticipantsData() {
         participants = [];
+        brokenCouples = [];
         const validationLogs = [];
         
         const nameMap = new Map(); // 동명이인 확인용
@@ -410,8 +415,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 8. 가중치 기반 탐욕적(Greedy) 매칭 알고리즘 코어
     btnRunMatching.addEventListener('click', () => {
+        runMatchingLogic(true);
+    });
+
+    function runMatchingLogic(resetBrokenCouples = false) {
+        if (resetBrokenCouples) {
+            brokenCouples = [];
+        }
+
         // 참가자 상태 리셋
-        participants.forEach(p => p.matched = false);
+        participants.forEach(p => {
+            p.matched = false;
+            p.nonConflictMatched = false;
+        });
         matchedCouples = [];
         unmatchedList = [];
         
@@ -435,6 +451,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 성별 필터
                 if (!allowSameGender && p1.gender === p2.gender) {
                     continue; // 동성 매칭 불허 시 스킵
+                }
+
+                // 깨진 커플 제외 필터
+                const isBroken = brokenCouples.some(bc => 
+                    (bc.male === p1.name && bc.female === p2.name) ||
+                    (bc.male === p2.name && bc.female === p1.name)
+                );
+                if (isBroken) {
+                    continue;
                 }
                 
                 // p1 -> p2 선호도 점수 계산
@@ -504,6 +529,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // 완벽한 동일 조건일 시 알파벳 순 정렬 (결과의 일관성 보장)
             return (a.p1.name + a.p2.name).localeCompare(b.p1.name + b.p2.name);
         });
+        
+        // 가능한 모든 상호 매칭 조합 복사 저장 (인쇄 및 전체 조회용)
+        allPossiblePairsGlobal = allPossiblePairs.map(p => ({ ...p }));
         
         // 동점 경합(동일 점수에서 한 사람을 두고 경쟁) 감지
         const conflictPairs = new Set();
@@ -591,7 +619,61 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 9. 결과 렌더링 및 통계 시각화
         renderMatchingResults();
-    });
+    }
+
+    // 대안 매칭(차선책) 탐색 헬퍼 함수
+    function findAlternativeMutualMatch(pName, currentPartnerName) {
+        const p = participants.find(part => part.name === pName);
+        if (!p) return null;
+        
+        const w1 = 10;
+        const w2 = 5;
+        const w3 = 2;
+        const wBonus = 100;
+        const weightMap = [w1, w2, w3];
+        
+        const alternatives = [];
+        
+        participants.forEach(other => {
+            if (other.name === pName || other.name === currentPartnerName || other.gender === p.gender) {
+                return;
+            }
+            
+            // 상호 지목 여부 확인
+            const pToOtherIndex = p.choices.indexOf(other.name);
+            const otherToPIndex = other.choices.indexOf(p.name);
+            
+            if (pToOtherIndex !== -1 && otherToPIndex !== -1) {
+                // 이미 취소된 커플 조합인지 확인
+                const isBroken = brokenCouples.some(bc => 
+                    (bc.male === pName && bc.female === other.name) ||
+                    (bc.male === other.name && bc.female === pName)
+                );
+                if (isBroken) return;
+                
+                const score = weightMap[pToOtherIndex] + weightMap[otherToPIndex] + wBonus;
+                alternatives.push({
+                    name: other.name,
+                    score,
+                    pRank: pToOtherIndex + 1,
+                    otherRank: otherToPIndex + 1
+                });
+            }
+        });
+        
+        if (alternatives.length === 0) return null;
+        
+        // 점수 기준 내림차순, 지망 순위 합 기준 오름차순, 이름 알파벳 기준 정렬
+        alternatives.sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            const sumA = a.pRank + a.otherRank;
+            const sumB = b.pRank + b.otherRank;
+            if (sumA !== sumB) return sumA - sumB;
+            return a.name.localeCompare(b.name);
+        });
+        
+        return alternatives[0];
+    }
 
     // 결과 렌더링 함수
     function renderMatchingResults() {
@@ -650,11 +732,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // 탭 숫자에 할당
         countCouplesTab.textContent = coupleCount;
         countUnmatchedTab.textContent = unmatchedList.length;
+        document.getElementById('count-broken-tab').textContent = brokenCouples.length;
+        document.getElementById('count-all-possible-tab').textContent = allPossiblePairsGlobal.length;
         
         // 2. 리스트 빌드
         filterAndRenderCouples();
         renderUnmatchedTable();
         renderDetailsTable();
+        renderBrokenCouplesTable();
+        renderAllPossibleTable();
     }
 
     // 카운팅 애니메이션 유틸
@@ -699,6 +785,7 @@ document.addEventListener('DOMContentLoaded', () => {
     searchCouplesEl.addEventListener('input', filterAndRenderCouples);
     filterCoupleTypeEl.addEventListener('change', filterAndRenderCouples);
     searchUnmatchedEl.addEventListener('input', renderUnmatchedTable);
+    searchAllPossibleEl.addEventListener('input', renderAllPossibleTable);
 
     // 커플 필터링 렌더링 함수
     function filterAndRenderCouples() {
@@ -792,7 +879,25 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const renderRankStr = (rank) => rank > 0 ? `${rank}순위` : '없음';
             
+            const altMale = findAlternativeMutualMatch(couple.male.name, couple.female.name);
+            const altFemale = findAlternativeMutualMatch(couple.female.name, couple.male.name);
+            
+            const renderAltStr = (alt, gender) => {
+                if (!alt) return `<span class="alt-none">차선책 없음</span>`;
+                const labelClass = gender === '여' ? 'female' : '';
+                return `<span class="alt-value ${labelClass}">♀️ ${alt.name} (${alt.score}점, ${alt.pRank}→${alt.otherRank}지망)</span>`;
+            };
+            const renderAltStrFemale = (alt) => {
+                if (!alt) return `<span class="alt-none">차선책 없음</span>`;
+                return `<span class="alt-value">♂️ ${alt.name} (${alt.score}점, ${alt.pRank}→${alt.otherRank}지망)</span>`;
+            };
+
+            const breakBtnHtml = couple.isConflict 
+                ? '' 
+                : `<button class="btn-break-couple" onclick="breakCouple('${couple.male.name}', '${couple.female.name}')" title="매칭 취소 (깨짐)">💔</button>`;
+
             card.innerHTML = `
+                ${breakBtnHtml}
                 <div class="couple-card-top">
                     ${typeBadgeHtml}
                     <div class="couple-score" style="color: ${couple.isMutual ? 'var(--color-pink)' : 'var(--text-muted)'}">
@@ -810,6 +915,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
                 <div class="couple-card-bottom">
                     선호 지목: 남성 → ${renderRankStr(couple.male.choices.indexOf(couple.female.name) + 1)} | 여성 → ${renderRankStr(couple.female.choices.indexOf(couple.male.name) + 1)}
+                </div>
+                <div class="couple-alternatives">
+                    <div class="alt-badge-container">
+                        <span class="alt-label">♂️ ${couple.male.name} 대안:</span>
+                        ${renderAltStr(altMale, '여')}
+                    </div>
+                    <div class="alt-badge-container">
+                        <span class="alt-label">♀️ ${couple.female.name} 대안:</span>
+                        ${renderAltStrFemale(altFemale)}
+                    </div>
                 </div>
             `;
             
@@ -896,6 +1011,154 @@ document.addEventListener('DOMContentLoaded', () => {
         // 4. 통계치 및 전체 레이아웃 리렌더링
         renderMatchingResults();
     };
+
+    // 커플 매칭 취소(깨짐) 처리 함수
+    window.breakCouple = function(maleName, femaleName) {
+        if (!confirm(`[${maleName} ❤️ ${femaleName}] 커플을 깨고 매칭을 취소하시겠습니까?\n두 사람은 각각 차선책 상호 지목 대상자와 실시간 재매칭을 시도하게 됩니다.`)) {
+            return;
+        }
+        
+        // brokenCouples에 추가
+        brokenCouples.push({
+            male: maleName,
+            female: femaleName,
+            timestamp: new Date().toLocaleString('ko-KR')
+        });
+        
+        // 매칭 재연산 실행 (brokenCouples 보존)
+        runMatchingLogic(false);
+    };
+
+    // 취소되었던 커플 매칭 복구 처리 함수
+    window.restoreCouple = function(maleName, femaleName) {
+        const index = brokenCouples.findIndex(bc => bc.male === maleName && bc.female === femaleName);
+        if (index === -1) return;
+        
+        if (!confirm(`[${maleName} ❤️ ${femaleName}] 커플 매칭을 복구하시겠습니까?\n복구 시 실시간으로 전체 매칭 결과가 다시 계산됩니다.`)) {
+            return;
+        }
+        
+        // brokenCouples에서 제거
+        brokenCouples.splice(index, 1);
+        
+        // 매칭 재연산 실행 (brokenCouples 보존)
+        runMatchingLogic(false);
+    };
+
+    // 취소된 커플 이력 테이블 렌더링 함수
+    function renderBrokenCouplesTable() {
+        const brokenTbody = document.getElementById('broken-tbody');
+        if (!brokenTbody) return;
+        
+        brokenTbody.innerHTML = '';
+        
+        if (brokenCouples.length === 0) {
+            brokenTbody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding: 24px; color: var(--text-muted);">취소된 매칭 이력이 없습니다.</td></tr>';
+            return;
+        }
+        
+        brokenCouples.forEach((bc, index) => {
+            const tr = document.createElement('tr');
+            
+            tr.innerHTML = `
+                <td style="font-family: var(--font-outfit); font-weight:700;">${index + 1}</td>
+                <td class="name-td"><span class="male-color">♂️ ${bc.male}</span> ❤️ <span class="female-color">♀️ ${bc.female}</span></td>
+                <td>${bc.timestamp}</td>
+                <td style="text-align: center;">
+                    <button class="btn-restore-couple" onclick="restoreCouple('${bc.male}', '${bc.female}')">
+                        🔄 매칭 복구하기
+                    </button>
+                </td>
+            `;
+            brokenTbody.appendChild(tr);
+        });
+    }
+
+    // 모든 상호 매칭 가능 조합 테이블 렌더링 함수
+    function renderAllPossibleTable() {
+        if (!allPossibleTbody) return;
+        
+        allPossibleTbody.innerHTML = '';
+        const searchWord = searchAllPossibleEl.value.toLowerCase().trim();
+        
+        const filtered = allPossiblePairsGlobal.filter(pair => {
+            return pair.p1.name.toLowerCase().includes(searchWord) || 
+                   pair.p2.name.toLowerCase().includes(searchWord);
+        });
+        
+        if (filtered.length === 0) {
+            allPossibleTbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding: 24px; color: var(--text-muted);">부합하는 가능한 상호 매칭 조합이 없습니다.</td></tr>';
+            return;
+        }
+        
+        filtered.forEach((pair, index) => {
+            const tr = document.createElement('tr');
+            
+            // p1과 p2의 선호도 랭크 구하기
+            const p1Rank = pair.p1ChoiceRank > 0 ? `${pair.p1ChoiceRank}순위` : '없음';
+            const p2Rank = pair.p2ChoiceRank > 0 ? `${pair.p2ChoiceRank}순위` : '없음';
+            
+            // 남성과 여성으로 매칭 정보 분리하여 출력
+            const male = pair.p1.gender === '남' ? pair.p1 : pair.p2;
+            const female = pair.p1.gender === '여' ? pair.p1 : pair.p2;
+            const maleRank = male.name === pair.p1.name ? p1Rank : p2Rank;
+            const femaleRank = female.name === pair.p1.name ? p1Rank : p2Rank;
+            
+            // 유형 배지 생성
+            let typeLabel = '';
+            if (pair.matchType === 'mutual-1-1') {
+                typeLabel = '<span class="badge badge-pink">💖 1-1 천생연분</span>';
+            } else if (pair.matchType === 'mutual-high') {
+                typeLabel = '<span class="badge badge-indigo">✨ 상호 우수</span>';
+            } else {
+                typeLabel = '<span class="badge badge-emerald">💚 상호 지목</span>';
+            }
+            
+            // 현재 매칭 상태 확인
+            let statusHtml = '';
+            const isCurrentlyMatchedTogether = matchedCouples.some(c => 
+                !c.isConflict &&
+                ((c.male.name === male.name && c.female.name === female.name) ||
+                 (c.male.name === female.name && c.female.name === male.name))
+            );
+            
+            const isBroken = brokenCouples.some(bc => 
+                (bc.male === male.name && bc.female === female.name) ||
+                (bc.male === female.name && bc.female === male.name)
+            );
+            
+            if (isCurrentlyMatchedTogether) {
+                statusHtml = '<span class="badge badge-pink" style="background: rgba(255, 101, 132, 0.12); color: var(--color-pink); border-color: var(--color-pink)">✅ 최종 매칭 완료</span>';
+            } else if (isBroken) {
+                statusHtml = '<span class="badge" style="background: rgba(239, 68, 68, 0.08); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.2)">💔 매칭 취소됨</span>';
+            } else {
+                // 다른 사람과 매칭되었는지 확인
+                const malePartner = matchedCouples.find(c => !c.isConflict && (c.male.name === male.name || c.female.name === male.name));
+                const femalePartner = matchedCouples.find(c => !c.isConflict && (c.male.name === female.name || c.female.name === female.name));
+                
+                const lostList = [];
+                if (malePartner) lostList.push(`남성→${malePartner.male.name === male.name ? malePartner.female.name : malePartner.male.name}`);
+                if (femalePartner) lostList.push(`여성→${femalePartner.male.name === female.name ? femalePartner.female.name : femalePartner.male.name}`);
+                
+                if (lostList.length > 0) {
+                    statusHtml = `<span class="badge" style="background: rgba(0,0,0,0.04); color: var(--text-secondary); border: 1px solid rgba(0,0,0,0.08); font-size:0.7rem;" title="${lostList.join(', ')}">❌ 타인과 매칭됨</span>`;
+                } else {
+                    statusHtml = '<span class="badge badge-warning">⚠️ 대기/미매칭</span>';
+                }
+            }
+            
+            tr.innerHTML = `
+                <td style="font-family: var(--font-outfit); font-weight:700;">${index + 1}</td>
+                <td class="name-td"><span class="male-color">♂️ ${male.name}</span> ❤️ <span class="female-color">♀️ ${female.name}</span></td>
+                <td>남성 → ${female.name} (${maleRank})</td>
+                <td>여성 → ${male.name} (${femaleRank})</td>
+                <td style="font-family: var(--font-outfit); font-weight:700; color:var(--color-pink);">${pair.score}점</td>
+                <td>${typeLabel}</td>
+                <td style="text-align: center;">${statusHtml}</td>
+            `;
+            allPossibleTbody.appendChild(tr);
+        });
+    }
 
     // 미매칭 테이블 렌더링
     function renderUnmatchedTable() {
@@ -1143,6 +1406,87 @@ document.addEventListener('DOMContentLoaded', () => {
                             <td style="border: 1px solid #ccc; padding: 10px;">${p.choices.map((c, i) => `${i+1}순위: ${c || '없음'}`).join(', ')}</td>
                         </tr>
                     `).join('')}
+                </tbody>
+            </table>
+            
+            <div style="page-break-before: always;"></div>
+            
+            <h2 style="font-size: 16pt; border-left: 5px solid #7d80f4; padding-left: 10px; margin-top: 30px; margin-bottom: 20px;">🔗 가능한 모든 상호 지목 경우의 수 (${allPossiblePairsGlobal.length}가지 조합)</h2>
+            <table class="data-table" style="width:100%; border-collapse: collapse; border: 1px solid #ccc; font-size: 9pt;">
+                <thead>
+                    <tr style="background: #f0f0f0;">
+                        <th style="border: 1px solid #ccc; padding: 8px; text-align: left; width: 60px;">우선순위</th>
+                        <th style="border: 1px solid #ccc; padding: 8px; text-align: left; width: 140px;">매칭 커플</th>
+                        <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">남성 선호</th>
+                        <th style="border: 1px solid #ccc; padding: 8px; text-align: left;">여성 선호</th>
+                        <th style="border: 1px solid #ccc; padding: 8px; text-align: left; width: 80px;">매칭 점수</th>
+                        <th style="border: 1px solid #ccc; padding: 8px; text-align: left; width: 90px;">유형</th>
+                        <th style="border: 1px solid #ccc; padding: 8px; text-align: left; width: 120px;">현재 매칭 상태</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${allPossiblePairsGlobal.map((pair, index) => {
+                        const p1Rank = pair.p1ChoiceRank > 0 ? `${pair.p1ChoiceRank}순위` : '없음';
+                        const p2Rank = pair.p2ChoiceRank > 0 ? `${pair.p2ChoiceRank}순위` : '없음';
+                        const male = pair.p1.gender === '남' ? pair.p1 : pair.p2;
+                        const female = pair.p1.gender === '여' ? pair.p1 : pair.p2;
+                        const maleRank = male.name === pair.p1.name ? p1Rank : p2Rank;
+                        const femaleRank = female.name === pair.p1.name ? p1Rank : p2Rank;
+                        
+                        let typeLabel = '';
+                        if (pair.matchType === 'mutual-1-1') {
+                            typeLabel = '1-1 천생연분';
+                        } else if (pair.matchType === 'mutual-high') {
+                            typeLabel = '상호 우수';
+                        } else {
+                            typeLabel = '상호 지목';
+                        }
+                        
+                        // 현재 매칭 상태 확인
+                        let statusText = '';
+                        const isCurrentlyMatchedTogether = matchedCouples.some(c => 
+                            !c.isConflict &&
+                            ((c.male.name === male.name && c.female.name === female.name) ||
+                             (c.male.name === female.name && c.female.name === male.name))
+                        );
+                        
+                        const isBroken = brokenCouples.some(bc => 
+                            (bc.male === male.name && bc.female === female.name) ||
+                            (bc.male === female.name && bc.female === male.name)
+                        );
+                        
+                        if (isCurrentlyMatchedTogether) {
+                            statusText = '최종 매칭 완료';
+                        } else if (isBroken) {
+                            statusText = '매칭 취소됨';
+                        } else {
+                            // 다른 사람과 매칭되었는지 확인
+                            const malePartner = matchedCouples.find(c => !c.isConflict && (c.male.name === male.name || c.female.name === male.name));
+                            const femalePartner = matchedCouples.find(c => !c.isConflict && (c.male.name === female.name || c.female.name === female.name));
+                            
+                            const lost = [];
+                            if (malePartner) lost.push(`남성→${malePartner.male.name === male.name ? malePartner.female.name : malePartner.male.name}`);
+                            if (femalePartner) lost.push(`여성→${femalePartner.male.name === female.name ? femalePartner.female.name : femalePartner.male.name}`);
+                            
+                            if (lost.length > 0) {
+                                statusText = '타인과 매칭됨';
+                            } else {
+                                statusText = '대기/미매칭';
+                            }
+                        }
+                        
+                        return `
+                            <tr>
+                                <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold; font-family: var(--font-outfit);">${index + 1}</td>
+                                <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold;">♂️ ${male.name} ❤️ ♀️ ${female.name}</td>
+                                <td style="border: 1px solid #ccc; padding: 8px;">남성 → ${female.name} (${maleRank})</td>
+                                <td style="border: 1px solid #ccc; padding: 8px;">여성 → ${male.name} (${femaleRank})</td>
+                                <td style="border: 1px solid #ccc; padding: 8px; font-weight: bold; color: var(--color-pink); font-family: var(--font-outfit);">${pair.score}점</td>
+                                <td style="border: 1px solid #ccc; padding: 8px;">${typeLabel}</td>
+                                <td style="border: 1px solid #ccc; padding: 8px; font-size: 0.8rem;">${statusText}</td>
+                            </tr>
+                        `;
+                    }).join('')}
                 </tbody>
             </table>
         `;

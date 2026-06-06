@@ -124,6 +124,10 @@
                                 <button class="tab-btn" data-tab="tab-unmatched">💔 미매칭 대상자 (<span
                                         id="count-unmatched-tab">0</span>)</button>
                                 <button class="tab-btn" data-tab="tab-details">📊 매칭 디테일 스코어</button>
+                                <button class="tab-btn" data-tab="tab-broken">💔 취소된 커플 (<span
+                                        id="count-broken-tab">0</span>)</button>
+                                <button class="tab-btn" data-tab="tab-all-possible">🔗 모든 상호 지목 경우의 수 (<span
+                                        id="count-all-possible-tab">0</span>)</button>
                             </div>
 
                             <div class="tab-content active" id="tab-couples">
@@ -178,6 +182,49 @@
                                             </tr>
                                         </thead>
                                         <tbody id="details-tbody">
+                                            <!-- Dynamic rows -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="tab-content" id="tab-broken">
+                                <div class="unmatched-list-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 80px;">순번</th>
+                                                <th>취소된 커플 조합</th>
+                                                <th>취소 일시</th>
+                                                <th style="width: 150px; text-align: center;">복구 관리</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="broken-tbody">
+                                            <!-- Dynamic rows -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="tab-content" id="tab-all-possible">
+                                <div class="search-filter-bar">
+                                    <input type="text" placeholder="이름으로 검색..." class="search-input"
+                                        id="search-all-possible">
+                                </div>
+                                <div class="unmatched-list-container">
+                                    <table class="data-table">
+                                        <thead>
+                                            <tr>
+                                                <th style="width: 80px;">우선순위</th>
+                                                <th>매칭 커플</th>
+                                                <th>남성 선호</th>
+                                                <th>여성 선호</th>
+                                                <th style="width: 100px;">매칭 점수</th>
+                                                <th style="width: 150px;">유형</th>
+                                                <th style="width: 150px; text-align: center;">현재 매칭 상태</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="all-possible-tbody">
                                             <!-- Dynamic rows -->
                                         </tbody>
                                     </table>

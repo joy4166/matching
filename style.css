@@ -1354,6 +1354,111 @@ input:checked + .slider:before {
 }
 
 /* ==========================================================================
+   매칭 취소(깨짐) & 대안 매칭(차선책) 추가 프리미엄 스타일링
+   ========================================================================== */
+
+/* 매칭 깨기 버튼 */
+.btn-break-couple {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(239, 68, 68, 0.06);
+    border: 1px solid rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    z-index: 10;
+}
+
+.btn-break-couple:hover {
+    background: #ef4444;
+    color: white;
+    transform: scale(1.15) rotate(15deg);
+    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.25);
+    border-color: #ef4444;
+}
+
+/* 대안 매칭 (차선책) 정보 영역 */
+.couple-alternatives {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(0, 0, 0, 0.06);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    text-align: left;
+}
+
+.alt-badge-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.74rem;
+}
+
+.alt-label {
+    color: var(--text-secondary);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.alt-value {
+    background: rgba(125, 128, 244, 0.08);
+    color: var(--color-indigo);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+    border: 1px solid rgba(125, 128, 244, 0.15);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.alt-value.female {
+    background: rgba(255, 101, 132, 0.08);
+    color: var(--color-pink);
+    border-color: rgba(255, 101, 132, 0.15);
+}
+
+.alt-none {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.72rem;
+}
+
+/* 커플 복구 버튼 */
+.btn-restore-couple {
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: rgba(58, 197, 160, 0.08);
+    border: 1px solid rgba(58, 197, 160, 0.2);
+    color: var(--color-emerald);
+    font-weight: 700;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-restore-couple:hover {
+    background: var(--color-emerald);
+    color: white;
+    box-shadow: 0 4px 12px var(--color-emerald-glow);
+    border-color: var(--color-emerald);
+}
+
+/* ==========================================================================
    12. 인쇄용 CSS (프린트 레이아웃)
    ========================================================================== */
 @media print {
@@ -1361,6 +1466,12 @@ input:checked + .slider:before {
         background: white !important;
         color: black !important;
         font-family: sans-serif;
+    }
+
+    /* 매칭 취소 버튼 및 대안 매칭 정보는 인쇄 시 제외 */
+    .btn-break-couple,
+    .couple-alternatives {
+        display: none !important;
     }
     
     .app-container,
